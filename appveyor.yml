@@ -29,6 +29,8 @@ init:
   - cmd: cmake --version
   - cmd: msbuild /version
 
+shallow_clone: true
+
 # clone directory
 clone_folder: C:\projects\dart
 
