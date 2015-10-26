@@ -16,7 +16,6 @@ environment:
   BUILD_EXAMPLES: OFF  # don't build examples to not exceed allowed build time (40 min)
   BUILD_TUTORIALS: OFF  # don't build tutorials to not exceed allowed build time (40 min)
   BUILD_OSGDART: OFF
-  BUILD_CORE_ONLY: OFF
   matrix:
   - BUILD_CORE_ONLY: ON
   - BUILD_CORE_ONLY: OFF
