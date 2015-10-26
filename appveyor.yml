@@ -49,7 +49,7 @@ install:
 # scripts to run before build
 before_build:
   - cmd: cd C:\projects\dart
-  - cmd: md build
+  - cmd: mkdir build
   - cmd: cd build
   # We generate project files for Visual Studio 12 because the boost binaries installed on the test server are for Visual Studio 12.
   - cmd: if "%platform%"=="Win32" set CMAKE_GENERATOR_NAME=Visual Studio 12
