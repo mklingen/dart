@@ -1963,5 +1963,26 @@ BoundingBox::BoundingBox(const Eigen::Vector3d& min, const Eigen::Vector3d& max)
 }
 
 
+Mesh::Mesh()
+{
+
+}
+
+Mesh::~Mesh()
+{
+
+}
+
+void Mesh::transform(const Eigen::Isometry3d& tf)
+{
+    for (size_t i = 0; i < vertices.size(); i++) {
+        vertices.at(i) = tf * vertices.at(i);
+    }
+    for (size_t i = 0; i < normals.size(); i++) {
+        normals.at(i) = tf.linear() * normals.at(i);
+    }
+
+}
+
 }  // namespace math
 }  // namespace dart

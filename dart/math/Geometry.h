@@ -562,6 +562,23 @@ class BoundingBox {
         Eigen::Vector3d mMax;
 };
 
+class Mesh
+{
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        Mesh();
+        virtual ~Mesh();
+
+        //\brief pre-multiply the vertices and normals by the transform.
+        void transform(const Eigen::Isometry3d& tf);
+
+        Eigen::aligned_vector<Eigen::Vector3i> indices;
+        Eigen::aligned_vector<Eigen::Vector3d> vertices;
+        Eigen::aligned_vector<Eigen::Vector3d> normals;
+        Eigen::aligned_vector<Eigen::Vector4d> colors;
+};
+
+
 }  // namespace math
 }  // namespace dart
 

@@ -100,13 +100,12 @@ void ArrowShape::setProperties(const Properties& _properties)
 void ArrowShape::setRGBA(const Eigen::Vector4d& _color)
 {
   mColor = _color;
-  for(size_t i=0; i<mMesh->mNumMeshes; ++i)
+  for(size_t i=0; i<mMeshData.size(); ++i)
   {
-    aiMesh* mesh = mMesh->mMeshes[i];
-    for(size_t j=0; j<mesh->mNumVertices; ++j)
+    math::Mesh& mesh = mMeshData.at(i);
+    for(size_t j = 0; j< mesh.vertices.size(); ++j)
     {
-      mesh->mColors[0][j] = aiColor4D(_color[0], _color[1],
-                                      _color[2], _color[3]);
+      mesh.colors.at(j) = _color;
     }
   }
 }
@@ -118,11 +117,11 @@ const ArrowShape::Properties& ArrowShape::getProperties() const
 }
 
 //==============================================================================
-static void constructArrowTip(aiMesh* mesh, double base, double tip,
+static void constructArrowTip(math::Mesh& mesh, double base, double tip,
                               const ArrowShape::Properties& properties)
 {
-  size_t resolution = (mesh->mNumVertices-1)/2;
-  for(size_t i=0; i<resolution; ++i)
+  size_t resolution = (mesh.vertices.size() - 1) / 2;
+  for (size_t i = 0; i < resolution; ++i)
   {
     double theta = (double)(i)/(double)(resolution)*2*M_PI;
 
@@ -130,7 +129,7 @@ static void constructArrowTip(aiMesh* mesh, double base, double tip,
     double x = R*cos(theta);
     double y = R*sin(theta);
     double z = base;
-    mesh->mVertices[2*i].Set(x, y, z);
+    mesh.vertices[2*i] = Eigen::Vector3d(x, y, z);
 
     if(base != tip)
     {
@@ -138,17 +137,17 @@ static void constructArrowTip(aiMesh* mesh, double base, double tip,
       y *= properties.mHeadRadiusScale;
     }
 
-    mesh->mVertices[2*i+1].Set(x, y, z);
+    mesh.vertices[2*i+1] = Eigen::Vector3d(x, y, z);
   }
 
-  mesh->mVertices[mesh->mNumVertices-1].Set(0,0,tip);
+  mesh.vertices[mesh.vertices.size() - 1] = Eigen::Vector3d(0,0,tip);
 }
 
 //==============================================================================
-static void constructArrowBody(aiMesh* mesh, double z1, double z2,
+static void constructArrowBody(math::Mesh& mesh, double z1, double z2,
                                const ArrowShape::Properties& properties)
 {
-  size_t resolution = mesh->mNumVertices/2;
+  size_t resolution = mesh.vertices.size() / 2;
   for(size_t i=0; i<resolution; ++i)
   {
     double theta = (double)(i)/(double)(resolution)*2*M_PI;
@@ -157,10 +156,10 @@ static void constructArrowBody(aiMesh* mesh, double z1, double z2,
     double x = R*cos(theta);
     double y = R*sin(theta);
     double z = z1;
-    mesh->mVertices[2*i].Set(x, y, z);
+    mesh.vertices[2*i] = Eigen::Vector3d(x, y, z);
 
     z = z2;
-    mesh->mVertices[2*i+1].Set(x, y, z);
+    mesh.vertices[2*i+1] = Eigen::Vector3d(x, y, z);
   }
 }
 
@@ -194,26 +193,26 @@ void ArrowShape::configureArrow(const Eigen::Vector3d& _tail,
   // construct the tail
   if(mProperties.mDoubleArrow)
   {
-    constructArrowTip(mMesh->mMeshes[0], headLength, 0, mProperties);
+    constructArrowTip(mMeshData.at(0), headLength, 0, mProperties);
   }
   else
   {
-    constructArrowTip(mMesh->mMeshes[0], 0, 0, mProperties);
+    constructArrowTip(mMeshData.at(0), 0, 0, mProperties);
   }
 
   // construct the main body
   if(mProperties.mDoubleArrow)
   {
-    constructArrowBody(mMesh->mMeshes[1], headLength, length-headLength,
+    constructArrowBody(mMeshData.at(1), headLength, length-headLength,
         mProperties);
   }
   else
   {
-    constructArrowBody(mMesh->mMeshes[1], 0, length-headLength, mProperties);
+    constructArrowBody(mMeshData.at(1), 0, length-headLength, mProperties);
   }
 
   // construct the head
-  constructArrowTip(mMesh->mMeshes[2], length-headLength, length, mProperties);
+  constructArrowTip(mMeshData.at(2), length-headLength, length, mProperties);
 
   Eigen::Isometry3d tf(Eigen::Isometry3d::Identity());
   tf.translation() = mTail;
@@ -231,142 +230,117 @@ void ArrowShape::configureArrow(const Eigen::Vector3d& _tail,
     tf.rotate(Eigen::AngleAxisd(acos(z.dot(v)), axis));
   }
 
-  aiNode* node = mMesh->mRootNode;
-  for(size_t i=0; i<4; ++i)
-    for(size_t j=0; j<4; ++j)
-      node->mTransformation[i][j] = tf(i,j);
+  for (size_t i = 0; i < mMeshData.size(); i++) {
+      mMeshData.at(i).transform(tf);
+  }
 }
 
 //==============================================================================
 void ArrowShape::instantiate(size_t resolution)
 {
-  aiNode* node = new aiNode;
-  node->mNumMeshes = 3;
-  node->mMeshes = new unsigned int[3];
-  for(size_t i=0; i<3; ++i)
-    node->mMeshes[i] = i;
-
-  aiScene* scene = new aiScene;
-  scene->mNumMeshes = 3;
-  scene->mMeshes = new aiMesh*[3];
-  scene->mRootNode = node;
-
-  scene->mMaterials = new aiMaterial*[1];
-  scene->mMaterials[0] = new aiMaterial;
+  mMeshData.clear();
+  mMeshData.resize(3);
 
   // allocate memory
   for(size_t i=0; i<3; ++i)
   {
     size_t numVertices = (i==0 || i==2)? 2*resolution+1 : 2*resolution;
 
-    aiMesh* mesh = new aiMesh;
-    mesh->mMaterialIndex = (unsigned int)(-1);
-
-    mesh->mNumVertices = numVertices;
-    mesh->mVertices = new aiVector3D[numVertices];
-    mesh->mNormals = new aiVector3D[numVertices];
-    mesh->mColors[0] = new aiColor4D[numVertices];
+    math::Mesh& mesh = mMeshData.at(i);
+    mesh.vertices.resize(numVertices);
+    mesh.normals.resize(numVertices);
+    mesh.colors.resize(numVertices);
 
     size_t numFaces = (i==0 || i==2)? 3*resolution : numVertices;
-    mesh->mNumFaces = numFaces;
-    mesh->mFaces = new aiFace[numFaces];
-    for(size_t j=0; j<numFaces; ++j)
-    {
-      mesh->mFaces[j].mNumIndices = 3;
-      mesh->mFaces[j].mIndices = new unsigned int[3];
-    }
-
-    scene->mMeshes[i] = mesh;
+    mesh.indices.resize(numFaces);
   }
 
   // set normals
-  aiMesh* mesh = scene->mMeshes[0];
+  math::Mesh& mesh = mMeshData.at(0);
   for(size_t i=0; i<resolution; ++i)
   {
-    mesh->mNormals[2*i].Set(0.0f, 0.0f, 1.0f);
+    mesh.normals[2*i] = Eigen::Vector3d(0.0f, 0.0f, 1.0f);
 
     double theta = (double)(i)/(double)(resolution)*2*M_PI;
-    mesh->mNormals[2*i+1].Set(cos(theta), sin(theta), 0.0f);
+    mesh.normals[2*i+1] = Eigen::Vector3d(cos(theta), sin(theta), 0.0f);
   }
-  mesh->mNormals[mesh->mNumVertices-1].Set(0.0f, 0.0f, -1.0f);
+  mesh.normals[mesh.vertices.size()-1] = Eigen::Vector3d(0.0f, 0.0f, -1.0f);
 
-  mesh = scene->mMeshes[1];
+  mesh = mMeshData.at(1);
   for(size_t i=0; i<resolution; ++i)
   {
     double theta = (double)(i)/(double)(resolution)*2*M_PI;
-    mesh->mNormals[2*i].Set(cos(theta), sin(theta), 0.0f);
-    mesh->mNormals[2*i+1].Set(cos(theta), sin(theta), 0.0f);
+    mesh.normals[2*i] = Eigen::Vector3d(cos(theta), sin(theta), 0.0f);
+    mesh.normals[2*i+1] = Eigen::Vector3d(cos(theta), sin(theta), 0.0f);
   }
 
-  mesh = scene->mMeshes[2];
+  mesh = mMeshData.at(2);
   for(size_t i=0; i<resolution; ++i)
   {
-    mesh->mNormals[2*i].Set(0.0f, 0.0f, -1.0f);
+    mesh.normals[2*i] = Eigen::Vector3d(0.0f, 0.0f, -1.0f);
 
     double theta = (double)(i)/(double)(resolution)*2*M_PI;
-    mesh->mNormals[2*i+1].Set(cos(theta), sin(theta), 0.0f);
+    mesh.normals[2*i+1] = Eigen::Vector3d(cos(theta), sin(theta), 0.0f);
   }
-  mesh->mNormals[mesh->mNumVertices-1].Set(0.0f, 0.0f, 1.0f);
+  mesh.normals[mesh.vertices.size()-1] = Eigen::Vector3d(0.0f, 0.0f, 1.0f);
 
   // set faces
-  mesh = scene->mMeshes[0];
-  aiFace* face;
+  mesh = mMeshData.at(0);
+  Eigen::Vector3i& face = mesh.indices[0];
   for(size_t i=0; i<resolution; ++i)
   {
     // Back of head
-    face = &mesh->mFaces[3*i];
-    face->mIndices[0] = 2*i;
-    face->mIndices[1] = 2*i+1;
-    face->mIndices[2] = (i+1 < resolution)? 2*i+3 : 1;
+    face = mesh.indices[3*i];
+    face(0) = 2*i;
+    face(1) = 2*i+1;
+    face(2) = (i+1 < resolution)? 2*i+3 : 1;
 
-    face = &mesh->mFaces[3*i+1];
-    face->mIndices[0] = 2*i;
-    face->mIndices[1] = (i+1 < resolution)? 2*i+3 : 1;
-    face->mIndices[2] = (i+1 < resolution)? 2*i+2 : 0;
+    face = mesh.indices[3*i+1];
+    face(0) = 2*i;
+    face(1) = (i+1 < resolution)? 2*i+3 : 1;
+    face(2) = (i+1 < resolution)? 2*i+2 : 0;
 
     // Tip
-    face = &mesh->mFaces[3*i+2];
-    face->mIndices[0] = 2*i+1;
-    face->mIndices[1] = 2*resolution;
-    face->mIndices[2] = (i+1 < resolution)? 2*i+3 : 1;
+    face = mesh.indices[3*i+2];
+    face(0) = 2*i+1;
+    face(1) = 2*resolution;
+    face(2) = (i+1 < resolution)? 2*i+3 : 1;
   }
 
-  mesh = scene->mMeshes[1];
+  mesh = mMeshData.at(1);
   for(size_t i=0; i<resolution; ++i)
   {
-    face = &mesh->mFaces[2*i];
-    face->mIndices[0] = 2*i;
-    face->mIndices[1] = (i+1 < resolution)? 2*i+3 : 1;
-    face->mIndices[2] = 2*i+1;
+    face = mesh.indices[2*i];
+    face[0] = 2*i;
+    face[1] = (i+1 < resolution)? 2*i+3 : 1;
+    face[2] = 2*i+1;
 
-    face = &mesh->mFaces[2*i+1];
-    face->mIndices[0] = 2*i;
-    face->mIndices[1] = (i+1 < resolution)? 2*i+2 : 0;
-    face->mIndices[2] = (i+1 < resolution)? 2*i+3 : 1;
+    face = mesh.indices[2*i+1];
+    face(0) = 2*i;
+    face(1) = (i+1 < resolution)? 2*i+2 : 0;
+    face(2) = (i+1 < resolution)? 2*i+3 : 1;
   }
 
-  mesh = scene->mMeshes[2];
+  mesh = mMeshData.at(2);
   for(size_t i=0; i<resolution; ++i)
   {
     // Back of head
-    face = &mesh->mFaces[3*i];
-    face->mIndices[0] = 2*i;
-    face->mIndices[1] = (i+1 < resolution)? 2*i+3 : 1;
-    face->mIndices[2] = 2*i+1;
+    face = mesh.indices[3*i];
+    face(0) = 2*i;
+    face(1) = (i+1 < resolution)? 2*i+3 : 1;
+    face(2) = 2*i+1;
 
-    face = &mesh->mFaces[3*i+1];
-    face->mIndices[0] = 2*i;
-    face->mIndices[1] = (i+1 < resolution)? 2*i+2 : 0;
-    face->mIndices[2] = (i+1 < resolution)? 2*i+3 : 1;
+    face = mesh.indices[3*i+1];
+    face(0) = 2*i;
+    face(1) = (i+1 < resolution)? 2*i+2 : 0;
+    face(2) = (i+1 < resolution)? 2*i+3 : 1;
 
     // Tip
-    face = &mesh->mFaces[3*i+2];
-    face->mIndices[0] = 2*i+1;
-    face->mIndices[1] = (i+1 < resolution)? 2*i+3 : 1;
-    face->mIndices[2] = 2*resolution;
+    face = mesh.indices[3*i+2];
+    face(0) = 2*i+1;
+    face(1) = (i+1 < resolution)? 2*i+3 : 1;
+    face(2) = 2*resolution;
   }
-
-  mMesh = scene;
 
   setColor(mColor);
 }

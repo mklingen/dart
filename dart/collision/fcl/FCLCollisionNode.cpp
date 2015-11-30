@@ -296,6 +296,31 @@ fcl::BVHModel<BV>* createMesh(float _scaleX, float _scaleY, float _scaleZ,
   return model;
 }
 
+template<class BV>
+fcl::BVHModel<BV>* createMesh(const double& _scaleX, const double& _scaleY, const double& _scaleZ,
+                              const Eigen::aligned_vector<dart::math::Mesh>& _mesh) {
+  assert(_mesh);
+  fcl::BVHModel<BV>* model = new fcl::BVHModel<BV>;
+  model->beginModel();
+
+  for (unsigned int i = 0; i < _mesh.size(); i++) {
+    const dart::math::Mesh& mesh = _mesh.at(i);
+    for (unsigned int j = 0; j < mesh.indices.size(); j++) {
+      fcl::Vec3f vertices[3];
+      for (unsigned int k = 0; k < 3; k++) {
+        const Eigen::Vector3d& vertex = mesh.vertices.at(mesh.indices.at(j)(k));
+        vertices[k] = fcl::Vec3f(vertex.x() * _scaleX,
+                                 vertex.y() * _scaleY,
+                                 vertex.z() * _scaleZ);
+      }
+      model->addTriangle(vertices[0], vertices[1], vertices[2]);
+    }
+  }
+
+  model->endModel();
+  return model;
+}
+
 //==============================================================================
 template<class BV>
 fcl::BVHModel<BV>* createSoftMesh(const aiMesh* _mesh,
@@ -419,7 +444,7 @@ FCLCollisionNode::FCLCollisionNode(dynamics::BodyNode* _bodyNode)
             createMesh<fcl::OBBRSS>(shapeMesh->getScale()[0],
                                     shapeMesh->getScale()[1],
                                     shapeMesh->getScale()[2],
-                                    shapeMesh->getMesh()));
+                                    shapeMesh->getMeshData()));
 
         break;
       }

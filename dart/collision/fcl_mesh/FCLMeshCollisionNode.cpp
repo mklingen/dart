@@ -119,7 +119,7 @@ FCLMeshCollisionNode::FCLMeshCollisionNode(dynamics::BodyNode* _bodyNode)
         mMeshes.push_back(createMesh<fcl::OBBRSS>(shapeMesh->getScale()[0],
                                                   shapeMesh->getScale()[1],
                                                   shapeMesh->getScale()[2],
-                                                  shapeMesh->getMesh(),
+                                                  shapeMesh->getMeshData(),
                                                   shapeT));
         break;
       }

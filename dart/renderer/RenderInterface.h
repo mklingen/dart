@@ -44,6 +44,7 @@
 #include <Eigen/Dense>
 
 #include "dart/math/MathTypes.h"
+#include "dart/math/Geometry.h"
 
 namespace dart {
 namespace renderer {
@@ -107,6 +108,7 @@ public:
     virtual void drawCube(const Eigen::Vector3d& _size);
     virtual void drawCylinder(double _radius, double _height);
     virtual void drawMesh(const Eigen::Vector3d& _scale, const aiScene* _mesh);
+    virtual void drawMesh(const Eigen::Vector3d& _scale, const Eigen::aligned_vector<dart::math::Mesh>& _mesh);
     virtual void drawList(unsigned int index);
     virtual void drawLineSegments(const std::vector<Eigen::Vector3d>& _vertices,
                                   const Eigen::aligned_vector<Eigen::Vector2i>& _connections);

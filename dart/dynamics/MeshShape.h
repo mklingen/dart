@@ -42,6 +42,8 @@
 
 #include <assimp/scene.h>
 
+#include <dart/math/Geometry.h>
+
 #include "dart/dynamics/Shape.h"
 #include "dart/common/ResourceRetriever.h"
 
@@ -53,6 +55,7 @@ class IOSystem;
 
 namespace dart {
 namespace dynamics {
+
 
 /// \brief
 class MeshShape : public Shape {
@@ -75,8 +78,6 @@ public:
   /// \brief Destructor.
   virtual ~MeshShape();
 
-  /// \brief
-  const aiScene* getMesh() const;
 
   /// Update positions of the vertices or the elements. By default, this does
   /// nothing; you must extend the MeshShape class and implement your own
@@ -141,6 +142,10 @@ public:
   // Documentation inherited.
   Eigen::Matrix3d computeInertia(double _mass) const override;
 
+  // \brief
+  inline const Eigen::aligned_vector<dart::math::Mesh>& getMeshData() const { return mMeshData; }
+  inline Eigen::aligned_vector<dart::math::Mesh>& getMeshData() { return mMeshData; }
+
 protected:
   // Documentation inherited.
   void computeVolume() override;
@@ -150,8 +155,6 @@ private:
   void _updateBoundingBoxDim();
 
 protected:
-  /// \brief
-  const aiScene* mMesh;
 
   /// \brief URI the mesh, if available).
   std::string mMeshUri;
@@ -173,6 +176,9 @@ protected:
 
   /// Specifies which color index should be used when mColorMode is COLOR_INDEX
   int mColorIndex;
+
+  /// \brief the actual mesh data is stored here
+  Eigen::aligned_vector<dart::math::Mesh> mMeshData;
 
 public:
   // To get byte-aligned Eigen vectors

@@ -42,13 +42,15 @@
 
 #include <assimp/scene.h>
 
+#include <dart/math/Geometry.h>
+
 #include "fcl/BVH/BVH_model.h"
 
 namespace dart {
 namespace collision {
 
 template<class BV>
-fcl::BVHModel<BV>* createMesh(float _scaleX, float _scaleY, float _scaleZ,
+fcl::BVHModel<BV>* createAssimpMesh(float _scaleX, float _scaleY, float _scaleZ,
                               const aiScene* _mesh,
                               const fcl::Transform3f& _transform) {
   assert(_mesh);
@@ -74,6 +76,60 @@ fcl::BVHModel<BV>* createMesh(float _scaleX, float _scaleY, float _scaleZ,
   model->endModel();
   return model;
 }
+
+template<class BV>
+fcl::BVHModel<BV>* createMesh(float _scaleX, float _scaleY, float _scaleZ,
+                              const Eigen::aligned_vector<dart::math::Mesh>& _mesh,
+                              const fcl::Transform3f& _transform) {
+  assert(_mesh);
+  fcl::BVHModel<BV>* model = new fcl::BVHModel<BV>;
+  model->beginModel();
+
+  for (unsigned int i = 0; i < _mesh.size(); i++) {
+    const dart::math::Mesh& mesh = _mesh.at(i);
+    for (unsigned int j = 0; j < mesh.indices.size(); j++) {
+      fcl::Vec3f vertices[3];
+      for (unsigned int k = 0; k < 3; k++) {
+        const Eigen::Vector3d& vertex = mesh.vertices.at(mesh.indices.at(j)(k));
+        vertices[k] = fcl::Vec3f(vertex.x() * _scaleX,
+                                 vertex.y() * _scaleY,
+                                 vertex.z() * _scaleZ);
+        vertices[k] = _transform.transform(vertices[k]);
+      }
+      model->addTriangle(vertices[0], vertices[1], vertices[2]);
+    }
+  }
+
+  model->endModel();
+  return model;
+}
+
+template<class BV>
+fcl::BVHModel<BV>* createMesh(const double& _scaleX, const double& _scaleY, const double& _scaleZ,
+                              const Eigen::aligned_vector<dart::math::Mesh>& _mesh) {
+  assert(_mesh);
+  fcl::BVHModel<BV>* model = new fcl::BVHModel<BV>;
+  model->beginModel();
+
+  for (unsigned int i = 0; i < _mesh.size(); i++) {
+    const dart::math::Mesh& mesh = _mesh.at(i);
+    for (unsigned int j = 0; j < mesh.indices.size(); j++) {
+      fcl::Vec3f vertices[3];
+      for (unsigned int k = 0; k < 3; k++) {
+        const Eigen::Vector3d& vertex = mesh.vertices.at(mesh.indices.at(j)(k));
+        vertices[k] = fcl::Vec3f(vertex.x() * _scaleX,
+                                 vertex.y() * _scaleY,
+                                 vertex.z() * _scaleZ);
+      }
+      model->addTriangle(vertices[0], vertices[1], vertices[2]);
+    }
+  }
+
+  model->endModel();
+  return model;
+}
+
+
 
 template<class BV>
 fcl::BVHModel<BV>* createEllipsoid(float _sizeX, float _sizeY, float _sizeZ,

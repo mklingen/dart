@@ -136,6 +136,10 @@ void RenderInterface::drawMesh(const Eigen::Vector3d& _scale, const aiScene* _me
 {
 }
 
+void RenderInterface::drawMesh(const Eigen::Vector3d& _scale, const Eigen::aligned_vector<dart::math::Mesh>& _mesh)
+{
+}
+
 void RenderInterface::drawList(unsigned int indeX)
 {
 }

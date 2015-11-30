@@ -128,6 +128,8 @@ aiMaterial::~aiMaterial()
   delete[] mProperties;
 }
 
+
+using namespace dart::math;
 namespace dart {
 namespace dynamics {
 
@@ -149,12 +151,8 @@ MeshShape::MeshShape(const Eigen::Vector3d& _scale, const aiScene* _mesh,
 }
 
 MeshShape::~MeshShape() {
-  delete mMesh;
 }
 
-const aiScene* MeshShape::getMesh() const {
-  return mMesh;
-}
 
 const std::string& MeshShape::getMeshUri() const
 {
@@ -167,14 +165,12 @@ void MeshShape::update()
 }
 
 void MeshShape::setAlpha(double _alpha) {
-
-  for(size_t i=0; i<mMesh->mNumMeshes; ++i)
-  {
-    aiMesh* mesh = mMesh->mMeshes[i];
-    for(size_t j=0; j<mesh->mNumVertices; ++j)
-      mesh->mColors[0][j][3] = _alpha;
+  for (size_t i = 0; i < mMeshData.size(); ++i) {
+      Mesh& mesh = mMeshData.at(i);
+      for (size_t j = 0; j < mesh.colors.size(); ++j) {
+          mesh.colors.at(j)(3) = _alpha;
+      }
   }
-
 }
 
 const std::string &MeshShape::getMeshPath() const
@@ -186,7 +182,6 @@ void MeshShape::setMesh(
   const aiScene* _mesh, const std::string& _path,
   const common::ResourceRetrieverPtr& _resourceRetriever)
 {
-  mMesh = _mesh;
 
   if(nullptr == _mesh) {
     mMeshPath = "";
@@ -211,6 +206,48 @@ void MeshShape::setMesh(
   }
 
   mResourceRetriever = _resourceRetriever;
+
+  for (size_t i = 0; i < _mesh->mNumMeshes; ++i) {
+      mMeshData.push_back(Mesh());
+      Mesh& mesh = mMeshData.at(i);
+      aiMesh* assimpMesh = _mesh->mMeshes[i];
+
+      if (assimpMesh->HasNormals()) {
+          mesh.normals.resize(assimpMesh->mNumVertices);
+          for (size_t j = 0; j < assimpMesh->mNumVertices; ++j) {
+              const aiVector3D& norm = assimpMesh->mNormals[i];
+              mesh.normals.at(j)(0) = norm.x;
+              mesh.normals.at(j)(1) = norm.y;
+              mesh.normals.at(j)(2) = norm.z;
+          }
+      }
+
+      if (assimpMesh->HasPositions()) {
+          mesh.vertices.resize(assimpMesh->mNumVertices);
+          for (size_t j = 0; j < assimpMesh->mNumVertices; ++j) {
+              const aiVector3D& vert = assimpMesh->mVertices[i];
+              mesh.vertices.at(j)(0) = vert.x;
+              mesh.vertices.at(j)(1) = vert.y;
+              mesh.vertices.at(j)(2) = vert.z;
+          }
+      }
+
+      if (assimpMesh->HasFaces()) {
+          mesh.indices.resize(assimpMesh->mNumFaces);
+
+          for (size_t j = 0; j < assimpMesh->mNumFaces; ++j) {
+              const aiFace& face = assimpMesh->mFaces[j];
+              if (face.mNumIndices != 3) {
+                  dtwarn << "[MeshShape::setMesh] Problem parsing URI '" << _path << ": only triangular faces supported.";
+                  break;
+              }
+              for (size_t k = 0; k < 3; k++) {
+                  mesh.indices[j][k] = face.mIndices[k];
+              }
+          }
+      }
+
+  }
 
   _updateBoundingBoxDim();
   computeVolume();
@@ -272,7 +309,7 @@ void MeshShape::draw(renderer::RenderInterface* _ri,
   _ri->pushMatrix();
   _ri->transform(mTransform);
 
-  _ri->drawMesh(mScale, mMesh);
+  _ri->drawMesh(mScale, mMeshData);
 
   _ri->popMatrix();
 }
@@ -305,20 +342,22 @@ void MeshShape::_updateBoundingBoxDim() {
   double min_Y = std::numeric_limits<double>::infinity();
   double min_Z = std::numeric_limits<double>::infinity();
 
-  for (unsigned int i = 0; i < mMesh->mNumMeshes; i++) {
-    for (unsigned int j = 0; j < mMesh->mMeshes[i]->mNumVertices; j++) {
-      if (mMesh->mMeshes[i]->mVertices[j].x > max_X)
-        max_X = mMesh->mMeshes[i]->mVertices[j].x;
-      if (mMesh->mMeshes[i]->mVertices[j].x < min_X)
-        min_X = mMesh->mMeshes[i]->mVertices[j].x;
-      if (mMesh->mMeshes[i]->mVertices[j].y > max_Y)
-        max_Y = mMesh->mMeshes[i]->mVertices[j].y;
-      if (mMesh->mMeshes[i]->mVertices[j].y < min_Y)
-        min_Y = mMesh->mMeshes[i]->mVertices[j].y;
-      if (mMesh->mMeshes[i]->mVertices[j].z > max_Z)
-        max_Z = mMesh->mMeshes[i]->mVertices[j].z;
-      if (mMesh->mMeshes[i]->mVertices[j].z < min_Z)
-        min_Z = mMesh->mMeshes[i]->mVertices[j].z;
+  for (unsigned int i = 0; i < mMeshData.size(); i++) {
+    const Mesh& mesh = mMeshData.at(i);
+    for (unsigned int j = 0; j < mesh.vertices.size(); j++) {
+      const Eigen::Vector3d& vert = mesh.vertices.at(j);
+      if (vert.x() > max_X)
+        max_X = vert.x();
+      else if (vert.x() < min_X)
+        min_X = vert.x();
+      if (vert.y() > max_Y)
+        max_Y = vert.y();
+      else if (vert.y() < min_Y)
+        min_Y = vert.y();
+      if (vert.z() > max_Z)
+        max_Z = vert.z();
+      else if (vert.z() < min_Z)
+        min_Z = vert.z();
     }
   }
   mBoundingBox.setMin(Eigen::Vector3d(min_X * mScale[0], min_Y * mScale[1], min_Z * mScale[2]));
